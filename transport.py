@@ -1,0 +1,119 @@
+from multiprocessing import Queue
+from cStringIO import StringIO
+import logging
+import uuid
+import pika
+
+from concurrent.futures import ThreadPoolExecutor
+from thrift.TTornado import _Lock
+from thrift.transport.TTransport import TTransportBase
+from tornado import gen, ioloop
+from tornado.concurrent import run_on_executor
+from pika.adapters import TornadoConnection
+
+import constant
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
+class TAMQPTornadoTransport(TTransportBase):
+    executor = ThreadPoolExecutor(10)
+
+    def __init__(self, channel=None, exchange_name=constant.EXCHANGE_NAME,
+                 routing_key=constant.ROUTING_KEY, properties=None,
+                 method=None, io_loop=None, **kwargs):
+        self._channel = channel
+        self._exchange_name = exchange_name
+        self._routing_key = routing_key
+        self._wbuf = StringIO()
+        self._properties = properties
+        self._method = method
+        self._url = kwargs.get('url', constant.DEFAULT_URL)
+        self._reply_to = None
+        self._lock = _Lock()
+        self._callback = None
+        self._connection = None
+        self._callback_queue = Queue()
+        self.io_loop = io_loop or ioloop.IOLoop.instance()
+
+    @gen.engine
+    def assign_queue(self):
+        logger.info("Openning callback queue")
+        result = yield gen.Task(self._channel.queue_declare,
+                                exclusive=True)
+        logger.info("Callback queue openned")
+        self._reply_to = result.method.queue
+        self._lock.release()
+        self._channel.basic_consume(self.on_reply_message, self._reply_to)
+        self._callback()
+
+    def on_reply_message(self, _channel, method, properties, body):
+        self._channel.basic_ack(delivery_tag=method.delivery_tag)
+        self._callback_queue.put(body)
+
+    def on_connection_open(self, _connection):
+        logger.info("Openning channel")
+        self._connection.channel(on_open_callback=self.on_channel_open)
+
+    def open(self, callback=None):
+        logger.info("Openning AMQP transport")
+        if self._channel is not None:
+            logger.info("Already set")
+            callback()
+        else:
+            logger.info("Openning connection")
+            self._callback = callback
+            self._connection = TornadoConnection(pika.URLParameters(self._url),
+                                                 self.on_connection_open)
+            self._lock.acquire()
+
+    @run_on_executor
+    def waitForFrame(self):
+        return self._callback_queue.get(True)
+
+    @gen.coroutine
+    def readFrame(self):
+        result = yield self.waitForFrame()
+        raise gen.Return(result)
+
+    def on_channel_open(self, channel):
+        logger.info("Channel openned")
+        self._channel = channel
+        self.assign_queue()
+
+    def close(self):
+        if self._channel:
+            self._channel.close()
+
+    def isOpen(self):
+        return self._channem is not None
+
+    def read(self, _):
+        assert False, "wrong stuff"
+
+    def write(self, buf):
+        self._wbuf.write(buf)
+
+    @gen.engine
+    def flush(self):
+        if self._properties is not None:
+            props = pika.BasicProperties(
+                correlation_id=self._properties.correlation_id)
+            self._channel.basic_publish(exchange='',
+                                        routing_key=self._properties.reply_to,
+                                        properties=props,
+                                        body=self._wbuf.getvalue())
+            if self._method is not None:
+                self._channel.basic_ack(
+                    delivery_tag=self._method.delivery_tag)
+        else:
+            with (yield self._lock.acquire()):
+                props = pika.BasicProperties(correlation_id=str(uuid.uuid4()),
+                                             reply_to=self._reply_to)
+
+                self._channel.basic_publish(exchange=self._exchange_name,
+                                            routing_key=self._routing_key,
+                                            properties=props,
+                                            body=str(self._wbuf.getvalue()))
+        self._wbuf = StringIO()
