@@ -1,10 +1,9 @@
 import sys
 sys.path.append('gen-py.tornado')
-sys.path.append('..')
 
 from thrift.protocol import TJSONProtocol
 from scrapper import Scrapper
-from server import TAMQPTornadoServer
+from thrift_amqp_tornado import TAMQPTornadoServer
 from tornado import ioloop, gen
 from tornado.httpclient import AsyncHTTPClient
 http_client = AsyncHTTPClient()

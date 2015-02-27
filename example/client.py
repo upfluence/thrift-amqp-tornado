@@ -1,11 +1,10 @@
 import sys
 sys.path.append('gen-py.tornado')
-sys.path.append('..')
 from tornado import ioloop, gen
 io_loop = ioloop.IOLoop.instance()
 from scrapper import Scrapper
 from thrift.protocol import TJSONProtocol
-from transport import TAMQPTornadoTransport
+from thrift_amqp_tornado import TAMQPTornadoTransport
 
 
 def this_joint():
