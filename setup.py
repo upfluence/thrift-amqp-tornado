@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='thrift_amqp_tornado',
-      version='0.0.2',
+      version='0.0.3',
       description='Thirft transport implementation over the AMQP protocol',
       author='Alexis Montagne',
       author_email='alexis.montagne@upfluence.co',
