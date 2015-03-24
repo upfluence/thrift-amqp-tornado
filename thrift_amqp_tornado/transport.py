@@ -34,6 +34,7 @@ class TAMQPTornadoTransport(TTransportBase):
         self._lock = _Lock()
         self._callback = None
         self._connection = None
+        self._consumer_tag = None
         self._callback_queue = Queue()
         self.io_loop = io_loop or ioloop.IOLoop.instance()
 
@@ -45,11 +46,14 @@ class TAMQPTornadoTransport(TTransportBase):
         logger.info("Callback queue openned")
         self._reply_to = result.method.queue
         self._lock.release()
-        self._channel.basic_consume(self.on_reply_message, self._reply_to)
-        self._callback()
+        self._consumer_tag = self._channel.basic_consume(self.on_reply_message,
+                                                         self._reply_to)
+        if self._callback:
+            self._callback()
 
     def on_reply_message(self, _channel, method, properties, body):
-        self._channel.basic_ack(delivery_tag=method.delivery_tag)
+        if method:
+            self._channel.basic_ack(delivery_tag=method.delivery_tag)
         self._callback_queue.put(body)
 
     def on_connection_open(self, _connection):
@@ -84,6 +88,9 @@ class TAMQPTornadoTransport(TTransportBase):
 
     def close(self):
         if self._channel:
+            if self._consumer_tag:
+                self._channel.basic_cancel(consumer_tag=self._consumer_tag,
+                                           nowait=True)
             self._channel.close()
 
     def isOpen(self):
