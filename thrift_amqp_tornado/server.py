@@ -23,6 +23,7 @@ class TAMQPTornadoServer(object):
         self._url = kwargs.get('url', constant.DEFAULT_URL)
         self._exchange_name = kwargs.get('exchange_name',
                                          constant.EXCHANGE_NAME)
+        self._routing_key = kwargs.get('routing_key', constant.ROUTING_KEY)
         self._queue_name = kwargs.get('queue_name', constant.QUEUE_NAME)
 
     def start(self):
@@ -62,9 +63,12 @@ class TAMQPTornadoServer(object):
     def on_queue_declared(self, _queue):
         logger.info("Queue declared : {}".format(self._queue_name))
         self._channel.queue_bind(self.on_binded, self._queue_name,
-                                 self._exchange_name, constant.ROUTING_KEY)
+                                 self._exchange_name, self._routing_key)
 
     def on_binded(self, _bind):
+        logger.info(
+            "Queue {} binded to the {} exchange with the {} routing key".format(
+                self._queue_name, self._exchange_name, self._routing_key))
         self._channel.basic_consume(self.on_message, self._queue_name)
 
     @gen.coroutine
