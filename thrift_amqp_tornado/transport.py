@@ -1,16 +1,18 @@
-from multiprocessing import Queue
 from cStringIO import StringIO
 import logging
 import uuid
 import pika
 
 from concurrent.futures import ThreadPoolExecutor
+
 from thrift.TTornado import _Lock
 from thrift.transport.TTransport import TTransportBase
+
 from tornado import gen, ioloop
 from tornado.concurrent import run_on_executor
-from pika.adapters import TornadoConnection
 
+from pika.adapters import TornadoConnection
+from toro import Queue
 import constant
 
 logger = logging.getLogger(__name__)
@@ -18,8 +20,6 @@ logger.setLevel(logging.DEBUG)
 
 
 class TAMQPTornadoTransport(TTransportBase):
-    executor = ThreadPoolExecutor(10)
-
     def __init__(self, channel=None, exchange_name=constant.EXCHANGE_NAME,
                  routing_key=constant.ROUTING_KEY, properties=None,
                  method=None, io_loop=None, **kwargs):
@@ -38,7 +38,7 @@ class TAMQPTornadoTransport(TTransportBase):
         self._callback_queue = Queue()
         self.io_loop = io_loop or ioloop.IOLoop.instance()
 
-    @gen.engine
+    @gen.coroutine
     def assign_queue(self):
         logger.info("Openning callback queue")
         result = yield gen.Task(self._channel.queue_declare,
@@ -72,13 +72,9 @@ class TAMQPTornadoTransport(TTransportBase):
                                                  self.on_connection_open)
             self._lock.acquire()
 
-    @run_on_executor
-    def waitForFrame(self):
-        return self._callback_queue.get(True)
-
     @gen.coroutine
     def readFrame(self):
-        result = yield self.waitForFrame()
+        result = yield self._callback_queue.get()
         raise gen.Return(result)
 
     def on_channel_open(self, channel):
@@ -102,7 +98,7 @@ class TAMQPTornadoTransport(TTransportBase):
     def write(self, buf):
         self._wbuf.write(buf)
 
-    @gen.engine
+    @gen.coroutine
     def flush(self):
         if self._properties is not None:
             props = pika.BasicProperties(
