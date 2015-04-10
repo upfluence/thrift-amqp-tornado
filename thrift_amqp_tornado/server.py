@@ -25,6 +25,7 @@ class TAMQPTornadoServer(object):
                                          constant.EXCHANGE_NAME)
         self._routing_key = kwargs.get('routing_key', constant.ROUTING_KEY)
         self._queue_name = kwargs.get('queue_name', constant.QUEUE_NAME)
+        self._prefetch = kwargs.get('prefetch', 0)
 
     def start(self):
         logger.info("Starting the connection")
@@ -43,6 +44,7 @@ class TAMQPTornadoServer(object):
                 self._exchange_name, constant.EXCHANGE_TYPE))
 
         self._channel = channel
+        self._channel.basic_qos(prefetch_count=self._prefetch)
         try:
             self._channel.exchange_declare(self.on_exchange_declared,
                                            self._exchange_name,
