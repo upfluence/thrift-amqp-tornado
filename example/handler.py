@@ -31,7 +31,7 @@ class ScraperHandler(object):
 handler = ScraperHandler()
 processor = Scrapper.Processor(handler)
 pfactory = TJSONProtocol.TJSONProtocolFactory()
-server = TAMQPTornadoServer(processor, pfactory)
+server = TAMQPTornadoServer(processor, pfactory, prefetch=10)
 
 server.start()
 loop.start()
