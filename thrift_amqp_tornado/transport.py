@@ -99,7 +99,17 @@ class TAMQPTornadoTransport(TTransportBase):
         self._wbuf.write(buf)
 
     @gen.coroutine
-    def flush(self):
+    def flush(self, recovered=False):
+        try:
+            yield self.flush_once()
+        except pika.exceptions.ConnectionClosed as e:
+            if recovered:
+                raise e
+            self._connection.connect()
+            self.flush_once(True)
+
+    @gen.coroutine
+    def flush_once(self):
         if self._properties is not None:
             props = pika.BasicProperties(
                 correlation_id=self._properties.correlation_id)
