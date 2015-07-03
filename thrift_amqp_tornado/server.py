@@ -82,4 +82,7 @@ class TAMQPTornadoServer(object):
         iprot = self._iprot_factory.getProtocol(TMemoryBuffer(body))
         oprot = self._oprot_factory.getProtocol(trans)
 
-        yield self._processor.process(iprot, oprot)
+        try:
+            yield self._processor.process(iprot, oprot)
+        except:
+            self._channel.basic_ack(delivery_tag=method.delivery_tag)
