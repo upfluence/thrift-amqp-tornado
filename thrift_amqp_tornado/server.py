@@ -1,10 +1,11 @@
 import logging
+import copy
 
 import pika
 from pika.adapters import TornadoConnection
 from tornado import gen
 from thrift.transport.TTransport import TMemoryBuffer
-
+from thrift.Thrift import TMessageType
 from transport import TAMQPTornadoTransport
 import constant
 
@@ -75,14 +76,18 @@ class TAMQPTornadoServer(object):
 
     @gen.coroutine
     def on_message(self, _channel, method, properties, body):
-        trans = TAMQPTornadoTransport(channel=self._channel,
-                                      properties=properties,
-                                      method=method)
-
         iprot = self._iprot_factory.getProtocol(TMemoryBuffer(body))
-        oprot = self._oprot_factory.getProtocol(trans)
+        iprot_dup = self._iprot_factory.getProtocol(TMemoryBuffer(body))
 
-        try:
-            yield self._processor.process(iprot, oprot)
-        except:
+        if iprot_dup.readMessageBegin()[1] == TMessageType.ONEWAY:
+            yield self._processor.process(iprot, None)
             self._channel.basic_ack(delivery_tag=method.delivery_tag)
+        else:
+            trans = TAMQPTornadoTransport(channel=self._channel,
+                                          properties=properties,
+                                          method=method)
+            oprot = self._oprot_factory.getProtocol(trans)
+            try:
+                yield self._processor.process(iprot, oprot)
+            except Exception:
+                self._channel.basic_ack(delivery_tag=method.delivery_tag)
