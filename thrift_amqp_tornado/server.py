@@ -79,7 +79,12 @@ class TAMQPTornadoServer(object):
         iprot = self._iprot_factory.getProtocol(TMemoryBuffer(body))
         iprot_dup = self._iprot_factory.getProtocol(TMemoryBuffer(body))
 
-        if iprot_dup.readMessageBegin()[1] == TMessageType.ONEWAY:
+        try:
+            type = iprot_dup.readMessageBegin()[1]
+        except:
+            self._channel.basic_ack(delivery_tag=method.delivery_tag)
+
+        if type == TMessageType.ONEWAY:
             yield self._processor.process(iprot, None)
             self._channel.basic_ack(delivery_tag=method.delivery_tag)
         else:
