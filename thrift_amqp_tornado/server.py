@@ -83,6 +83,7 @@ class TAMQPTornadoServer(object):
             type = iprot_dup.readMessageBegin()[1]
         except:
             self._channel.basic_ack(delivery_tag=method.delivery_tag)
+            raise gen.Return()
 
         if type == TMessageType.ONEWAY:
             yield self._processor.process(iprot, None)
