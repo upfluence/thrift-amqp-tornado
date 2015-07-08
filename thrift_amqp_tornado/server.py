@@ -86,7 +86,11 @@ class TAMQPTornadoServer(object):
             raise gen.Return()
 
         if type == TMessageType.ONEWAY:
-            yield self._processor.process(iprot, None)
+            try:
+                yield self._processor.process(iprot, None)
+            except Exception as e:
+                logger.error(e, exc_info=True)
+
             self._channel.basic_ack(delivery_tag=method.delivery_tag)
         else:
             trans = TAMQPTornadoTransport(channel=self._channel,
