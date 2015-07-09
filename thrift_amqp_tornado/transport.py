@@ -69,8 +69,16 @@ class TAMQPTornadoTransport(TTransportBase):
             logger.info("Openning connection")
             self._callback = callback
             self._connection = TornadoConnection(pika.URLParameters(self._url),
-                                                 self.on_connection_open)
+                                                 self.on_connection_open,
+                                                 self.on_connection_error,
+                                                 self.on_connection_error)
             self._lock.acquire()
+
+    @gen.coroutine
+    def on_connection_error(self, *args, **kwargs):
+        logger.info("Connection failed")
+        yield gen.sleep(constant.TIMEOUT_RECONNECT)
+        self.start()
 
     @gen.coroutine
     def readFrame(self):
