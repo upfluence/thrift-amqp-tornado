@@ -31,7 +31,15 @@ class TAMQPTornadoServer(object):
     def start(self):
         logger.info("Starting the connection")
         self._connection = TornadoConnection(pika.URLParameters(self._url),
-                                             self.on_connection_open)
+                                             self.on_connection_open,
+                                             self.on_connection_error,
+                                             self.on_connection_error)
+
+    @gen.coroutine
+    def on_connection_error(self, *args, **kwargs):
+        logger.info("Connection failed")
+        yield gen.sleep(constant.TIMEOUT_RECONNECT)
+        self.start()
 
     def on_connection_open(self, _):
         logger.info("Connection started")
