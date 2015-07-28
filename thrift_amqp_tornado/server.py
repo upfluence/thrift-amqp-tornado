@@ -107,5 +107,6 @@ class TAMQPTornadoServer(object):
             oprot = self._oprot_factory.getProtocol(trans)
             try:
                 yield self._processor.process(iprot, oprot)
-            except Exception:
+            except Exception as e:
+                logger.error(e, exc_info=True)
                 self._channel.basic_ack(delivery_tag=method.delivery_tag)
