@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from thrift.TTornado import _Lock
 from thrift.transport.TTransport import TTransportBase
+import thrift.transport.TTransport
 
 from tornado import gen, ioloop
 from tornado.concurrent import run_on_executor
@@ -110,11 +111,10 @@ class TAMQPTornadoTransport(TTransportBase):
     def flush(self, recovered=False):
         try:
             yield self.flush_once()
-        except pika.exceptions.ConnectionClosed as e:
-            if recovered:
-                raise e
+        except Exception as e:
             self._connection.connect()
-            self.flush_once(True)
+            raise thrift.transport.TTransport.TTransportException(
+                message=str(e))
 
     @gen.coroutine
     def flush_once(self):
