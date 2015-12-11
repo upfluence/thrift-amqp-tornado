@@ -3,14 +3,11 @@ import logging
 import uuid
 import pika
 
-from concurrent.futures import ThreadPoolExecutor
-
 from thrift.TTornado import _Lock
 from thrift.transport.TTransport import TTransportBase
 import thrift.transport.TTransport
 
 from tornado import gen, ioloop
-from tornado.concurrent import run_on_executor
 
 from pika.adapters import TornadoConnection
 from toro import Queue
