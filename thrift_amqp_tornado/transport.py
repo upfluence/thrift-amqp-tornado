@@ -34,6 +34,7 @@ class TAMQPTornadoTransport(TTransportBase):
         self._connection = None
         self._consumer_tag = None
         self._consumer_name = kwargs.get('consumer_tag')
+        self._message_expiration = kwargs.get('message_expiration')
         self._callback_queue = Queue()
         self.io_loop = io_loop or ioloop.IOLoop.instance()
 
@@ -132,6 +133,9 @@ class TAMQPTornadoTransport(TTransportBase):
             with (yield self._lock.acquire()):
                 props = pika.BasicProperties(correlation_id=str(uuid.uuid4()),
                                              reply_to=self._reply_to)
+
+                if self._message_expiration:
+                    props.expiration = str(self._message_expiration * 1000)
 
                 self._channel.basic_publish(exchange=self._exchange_name,
                                             routing_key=self._routing_key,
