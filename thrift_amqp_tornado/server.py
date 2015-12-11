@@ -1,5 +1,4 @@
 import logging
-import copy
 
 import pika
 from pika.adapters import TornadoConnection
@@ -27,6 +26,7 @@ class TAMQPTornadoServer(object):
         self._routing_key = kwargs.get('routing_key', constant.ROUTING_KEY)
         self._queue_name = kwargs.get('queue_name', constant.QUEUE_NAME)
         self._prefetch = kwargs.get('prefetch', 0)
+        self._consumer_tag = kwargs.get('consumer_tag')
 
     def start(self):
         logger.info("Starting the connection")
@@ -80,7 +80,8 @@ class TAMQPTornadoServer(object):
         logger.info(
             "Queue {} binded to the {} exchange with the {} routing key".format(
                 self._queue_name, self._exchange_name, self._routing_key))
-        self._channel.basic_consume(self.on_message, self._queue_name)
+        self._channel.basic_consume(self.on_message, self._queue_name,
+                                    consumer_tag=self._consumer_tag)
 
     @gen.coroutine
     def on_message(self, _channel, method, properties, body):
