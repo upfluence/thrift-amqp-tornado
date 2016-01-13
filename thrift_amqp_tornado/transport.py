@@ -80,7 +80,7 @@ class TAMQPTornadoTransport(TTransportBase):
     def on_connection_error(self, *args, **kwargs):
         logger.info("Connection failed")
         yield gen.sleep(constant.TIMEOUT_RECONNECT)
-        self.start()
+        self.open(self._callback)
 
     @gen.coroutine
     def readFrame(self):
