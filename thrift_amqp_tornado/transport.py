@@ -42,7 +42,8 @@ class TAMQPTornadoTransport(TTransportBase):
     def assign_queue(self):
         logger.info("Openning callback queue")
         result = yield gen.Task(self._channel.queue_declare,
-                                exclusive=True)
+                                exclusive=True,
+                                auto_delete=True)
         logger.info("Callback queue openned")
         self._reply_to = result.method.queue
         self._lock.release()
