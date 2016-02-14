@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='thrift_amqp_tornado',
-      version='0.1.0',
+      version='0.1.1',
       description='Thirft transport implementation over the AMQP protocol',
       author='Alexis Montagne',
       author_email='alexis.montagne@upfluence.co',
