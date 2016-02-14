@@ -106,8 +106,10 @@ class TAMQPTornadoTransport(TTransportBase):
     def read(self, _):
         assert False, "wrong stuff"
 
+    @gen.coroutine
     def write(self, buf):
-        self._wbuf.write(buf)
+        with (yield self._lock.acquire()):
+            self._wbuf.write(buf)
 
     @gen.coroutine
     def flush(self, recovered=False):
