@@ -1,4 +1,4 @@
-from cStringIO import StringIO
+from StringIO import StringIO
 import logging
 import uuid
 import pika
