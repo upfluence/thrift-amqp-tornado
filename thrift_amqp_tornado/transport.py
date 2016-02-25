@@ -128,7 +128,7 @@ class TAMQPTornadoTransport(TTransportBase):
             self._channel.basic_publish(exchange='',
                                         routing_key=self._properties.reply_to,
                                         properties=props,
-                                        body=self._wbuf.getvalue())
+                                        body=self._wbuf.getvalue().encode("utf-8"))
             if self._method is not None:
                 self._channel.basic_ack(
                     delivery_tag=self._method.delivery_tag)
@@ -143,5 +143,5 @@ class TAMQPTornadoTransport(TTransportBase):
                 self._channel.basic_publish(exchange=self._exchange_name,
                                             routing_key=self._routing_key,
                                             properties=props,
-                                            body=str(self._wbuf.getvalue()))
+                                            body=self._wbuf.getvalue().encode("utf-8"))
         self._wbuf = StringIO()
