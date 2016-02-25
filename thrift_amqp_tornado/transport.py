@@ -112,7 +112,10 @@ class TAMQPTornadoTransport(TTransportBase):
     @gen.coroutine
     def write(self, buf):
         with (yield self._lock.acquire()):
-            self._wbuf.write(buf)
+            if type(buf) is unicode:
+                self._wbuf.write(buf.encode("utf-8"))
+            else:
+                self._wbuf.write(buf)
 
     @gen.coroutine
     def flush(self, recovered=False):
