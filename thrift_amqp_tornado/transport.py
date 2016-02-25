@@ -46,7 +46,10 @@ class TAMQPTornadoTransport(TTransportBase):
                                 auto_delete=True)
         logger.info("Callback queue openned")
         self._reply_to = result.method.queue
-        self._lock.release()
+
+        if self._lock.acquired():
+            self._lock.release()
+
         self._consumer_tag = self._channel.basic_consume(
             self.on_reply_message, self._reply_to,
             consumer_tag=self._consumer_name)
@@ -117,6 +120,7 @@ class TAMQPTornadoTransport(TTransportBase):
             yield self.flush_once()
         except Exception as e:
             self._connection.connect()
+            logger.info(e, exc_info=True)
             raise thrift.transport.TTransport.TTransportException(
                 message=str(e))
 
@@ -125,10 +129,16 @@ class TAMQPTornadoTransport(TTransportBase):
         if self._properties is not None:
             props = pika.BasicProperties(
                 correlation_id=self._properties.correlation_id)
+
+            result = self._wbuf.getvalue()
+
+            if type(result) is unicode:
+                result = result.encode("utf-8")
+
             self._channel.basic_publish(exchange='',
                                         routing_key=self._properties.reply_to,
                                         properties=props,
-                                        body=self._wbuf.getvalue().encode("utf-8"))
+                                        body=result)
             if self._method is not None:
                 self._channel.basic_ack(
                     delivery_tag=self._method.delivery_tag)
@@ -140,8 +150,13 @@ class TAMQPTornadoTransport(TTransportBase):
                 if self._message_expiration:
                     props.expiration = str(self._message_expiration * 1000)
 
+                result = self._wbuf.getvalue()
+
+                if type(result) is unicode:
+                    result = result.encode("utf-8")
+
                 self._channel.basic_publish(exchange=self._exchange_name,
                                             routing_key=self._routing_key,
                                             properties=props,
-                                            body=self._wbuf.getvalue().encode("utf-8"))
+                                            body=result)
         self._wbuf = StringIO()
