@@ -106,6 +106,7 @@ class TAMQPTornadoServer(object):
                                           properties=properties,
                                           method=method)
             oprot = self._oprot_factory.getProtocol(trans)
+
             try:
                 yield self._processor.process(iprot, oprot)
             except Exception as e:

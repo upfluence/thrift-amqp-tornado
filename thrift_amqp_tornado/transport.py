@@ -35,6 +35,8 @@ class TAMQPTornadoTransport(TTransportBase):
         self._consumer_tag = None
         self._consumer_name = kwargs.get('consumer_tag')
         self._message_expiration = kwargs.get('message_expiration')
+        self._reply_queue_name = kwargs.get('reply_queue_name', '')
+        self._error_logger = kwargs.get('error_logger')
         self._callback_queue = Queue()
         self.io_loop = io_loop or ioloop.IOLoop.instance()
 
@@ -42,10 +44,15 @@ class TAMQPTornadoTransport(TTransportBase):
     def assign_queue(self):
         logger.info("Openning callback queue")
         result = yield gen.Task(self._channel.queue_declare,
+                                queue=self._reply_queue_name,
                                 exclusive=True,
                                 auto_delete=True)
         logger.info("Callback queue openned")
-        self._reply_to = result.method.queue
+
+        if self._reply_queue_name == '':
+            self._reply_to = result.method.queue
+        else:
+            self._reply_to = self._reply_queue_name
 
         if self._lock.acquired():
             self._lock.release()
@@ -104,7 +111,7 @@ class TAMQPTornadoTransport(TTransportBase):
             self._channel.close()
 
     def isOpen(self):
-        return self._channem is not None
+        return self._channel is not None
 
     def read(self, _):
         assert False, "wrong stuff"
@@ -122,10 +129,15 @@ class TAMQPTornadoTransport(TTransportBase):
         try:
             yield self.flush_once()
         except Exception as e:
+            if self._error_logger:
+                self._error_logger.capture_exception()
+
             self._connection.connect()
             logger.info(e, exc_info=True)
             raise thrift.transport.TTransport.TTransportException(
                 message=str(e))
+
+        self._wbuf = StringIO()
 
     @gen.coroutine
     def flush_once(self):
