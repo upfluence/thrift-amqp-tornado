@@ -27,6 +27,7 @@ class TAMQPTornadoServer(object):
         self._queue_name = kwargs.get('queue_name', constant.QUEUE_NAME)
         self._prefetch = kwargs.get('prefetch', 0)
         self._consumer_tag = kwargs.get('consumer_tag')
+        self._error_logger = kwargs.get('error_logger')
 
     def start(self):
         logger.info("Starting the connection")
@@ -91,6 +92,7 @@ class TAMQPTornadoServer(object):
         try:
             type = iprot_dup.readMessageBegin()[1]
         except:
+            self._error_logger.capture_exception()
             self._channel.basic_ack(delivery_tag=method.delivery_tag)
             raise gen.Return()
 
@@ -98,6 +100,7 @@ class TAMQPTornadoServer(object):
             try:
                 yield self._processor.process(iprot, None)
             except Exception as e:
+                self._error_logger.capture_exception()
                 logger.error(e, exc_info=True)
 
             self._channel.basic_ack(delivery_tag=method.delivery_tag)
@@ -110,5 +113,6 @@ class TAMQPTornadoServer(object):
             try:
                 yield self._processor.process(iprot, oprot)
             except Exception as e:
+                self._error_logger.capture_exception()
                 logger.error(e, exc_info=True)
                 self._channel.basic_ack(delivery_tag=method.delivery_tag)
