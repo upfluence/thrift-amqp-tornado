@@ -71,7 +71,7 @@ class TAMQPTornadoServer(object):
         if self._connection and self._connection.is_open:
             self._connection.channel(on_open_callback=self.on_channel_open)
         else:
-            self.open()
+            self.start()
 
     def on_exchange_declared(self, _):
         logger.info(

@@ -52,7 +52,6 @@ class TAMQPTornadoTransport(TTransportBase):
 
         if self._reply_queue_name == '':
             self._reply_to = result.method.queue
-            self._reply_queue_name = result.method.queue
         else:
             self._reply_to = self._reply_queue_name
 
@@ -79,7 +78,8 @@ class TAMQPTornadoTransport(TTransportBase):
         logger.info("Openning AMQP transport")
         if self._channel is not None and self._channel.is_open:
             logger.info("Already set")
-            callback()
+            if callback:
+                callback()
         else:
             logger.info("Openning connection")
             self._callback = callback
