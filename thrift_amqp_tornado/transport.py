@@ -39,6 +39,7 @@ class TAMQPTornadoTransport(TTransportBase):
         self._error_logger = kwargs.get('error_logger')
         self._callback_queue = Queue()
         self.io_loop = io_loop or ioloop.IOLoop.instance()
+        self._closing = False
 
     @gen.coroutine
     def assign_queue(self):
@@ -51,6 +52,7 @@ class TAMQPTornadoTransport(TTransportBase):
 
         if self._reply_queue_name == '':
             self._reply_to = result.method.queue
+            self._reply_queue_name = result.method.queue
         else:
             self._reply_to = self._reply_queue_name
 
@@ -75,17 +77,17 @@ class TAMQPTornadoTransport(TTransportBase):
 
     def open(self, callback=None):
         logger.info("Openning AMQP transport")
-        if self._channel is not None:
+        if self._channel is not None and self._channel.is_open:
             logger.info("Already set")
             callback()
         else:
             logger.info("Openning connection")
             self._callback = callback
+            self._lock.acquire()
             self._connection = TornadoConnection(pika.URLParameters(self._url),
                                                  self.on_connection_open,
                                                  self.on_connection_error,
                                                  self.on_connection_error)
-            self._lock.acquire()
 
     @gen.coroutine
     def on_connection_error(self, *args, **kwargs):
@@ -98,12 +100,26 @@ class TAMQPTornadoTransport(TTransportBase):
         result = yield self._callback_queue.get()
         raise gen.Return(result)
 
+    def on_channel_close(self, *args):
+        logger.info("Channel closed")
+
+        if self._closing:
+            return
+
+        if self._connection and self._connection.is_open:
+            self._lock.acquire()
+            self._connection.channel(on_open_callback=self.on_channel_open)
+        else:
+            self.open()
+
     def on_channel_open(self, channel):
         logger.info("Channel openned")
         self._channel = channel
+        self._channel.add_on_close_callback(self.on_channel_close)
         self.assign_queue()
 
     def close(self):
+        self._closing = True
         if self._channel:
             if self._consumer_tag:
                 self._channel.basic_cancel(consumer_tag=self._consumer_tag,
@@ -128,16 +144,20 @@ class TAMQPTornadoTransport(TTransportBase):
     def flush(self, recovered=False):
         try:
             yield self.flush_once()
+            self._wbuf = StringIO()
         except Exception as e:
-            if self._error_logger:
-                self._error_logger.capture_exception()
+            yield gen.sleep(constant.TIMEOUT_RECONNECT)
 
-            self._connection.connect()
-            logger.info(e, exc_info=True)
-            raise thrift.transport.TTransport.TTransportException(
-                message=str(e))
+            if not recovered:
+                yield self.flush(True)
+            else:
+                if self._error_logger:
+                    self._error_logger.capture_exception()
 
-        self._wbuf = StringIO()
+                logger.info(e, exc_info=True)
+                self._wbuf = StringIO()
+                raise thrift.transport.TTransport.TTransportException(
+                    message=str(e))
 
     @gen.coroutine
     def flush_once(self):

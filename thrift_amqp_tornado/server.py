@@ -54,6 +54,7 @@ class TAMQPTornadoServer(object):
                 self._exchange_name, constant.EXCHANGE_TYPE))
 
         self._channel = channel
+        self._channel.add_on_close_callback(self.on_channel_close)
         self._channel.basic_qos(prefetch_count=self._prefetch)
         try:
             self._channel.exchange_declare(self.on_exchange_declared,
@@ -63,6 +64,14 @@ class TAMQPTornadoServer(object):
             self._channel.exchange_declare(self.on_exchange_declared,
                                            self._exchange_name,
                                            constant.EXCHANGE_TYPE, True)
+
+    def on_channel_close(self, *args):
+        logger.info("Channel closed")
+
+        if self._connection and self._connection.is_open:
+            self._connection.channel(on_open_callback=self.on_channel_open)
+        else:
+            self.open()
 
     def on_exchange_declared(self, _):
         logger.info(
