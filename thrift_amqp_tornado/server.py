@@ -28,9 +28,14 @@ class TAMQPTornadoServer(object):
         self._prefetch = kwargs.get('prefetch', 0)
         self._consumer_tag = kwargs.get('consumer_tag')
         self._error_logger = kwargs.get('error_logger')
+        self._starting = False
 
     def start(self):
+        if self._starting:
+            return
+
         logger.info("Starting the connection")
+        self._starting = True
         self._connection = TornadoConnection(pika.URLParameters(self._url),
                                              self.on_connection_open,
                                              self.on_connection_error,
@@ -65,13 +70,17 @@ class TAMQPTornadoServer(object):
                                            self._exchange_name,
                                            constant.EXCHANGE_TYPE, True)
 
+    @gen.coroutine
     def on_channel_close(self, *args):
         logger.info("Channel closed")
 
-        if self._connection and self._connection.is_open:
-            self._connection.channel(on_open_callback=self.on_channel_open)
-        else:
-            self.start()
+        yield gen.sleep(constant.TIMEOUT_RECONNECT)
+
+        if not self._starting:
+            if self._connection and self._connection.is_open:
+                self._connection.channel(on_open_callback=self.on_channel_open)
+            else:
+                self.start()
 
     def on_exchange_declared(self, _):
         logger.info(
@@ -92,6 +101,8 @@ class TAMQPTornadoServer(object):
                 self._queue_name, self._exchange_name, self._routing_key))
         self._channel.basic_consume(self.on_message, self._queue_name,
                                     consumer_tag=self._consumer_tag)
+
+        self.starting = False
 
     @gen.coroutine
     def on_message(self, _channel, method, properties, body):

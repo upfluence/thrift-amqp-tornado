@@ -40,6 +40,7 @@ class TAMQPTornadoTransport(TTransportBase):
         self._callback_queue = Queue()
         self.io_loop = io_loop or ioloop.IOLoop.instance()
         self._closing = False
+        self._starting = False
 
     @gen.coroutine
     def assign_queue(self):
@@ -62,6 +63,7 @@ class TAMQPTornadoTransport(TTransportBase):
             self.on_reply_message, self._reply_to,
             consumer_tag=self._consumer_name)
 
+        self._starting = False
         if self._callback:
             self._callback()
 
@@ -75,6 +77,13 @@ class TAMQPTornadoTransport(TTransportBase):
         self._connection.channel(on_open_callback=self.on_channel_open)
 
     def open(self, callback=None):
+        if self._starting:
+            if callback:
+                callback()
+            return
+
+        self._starting = True
+
         logger.info("Openning AMQP transport")
         if self._channel is not None and self._channel.is_open:
             logger.info("Already set")
@@ -100,17 +109,18 @@ class TAMQPTornadoTransport(TTransportBase):
         result = yield self._callback_queue.get()
         raise gen.Return(result)
 
+    @gen.coroutine
     def on_channel_close(self, *args):
         logger.info("Channel closed")
 
-        if self._closing:
-            return
+        yield gen.sleep(constant.TIMEOUT_RECONNECT)
 
-        if self._connection and self._connection.is_open:
-            self._lock.acquire()
-            self._connection.channel(on_open_callback=self.on_channel_open)
-        else:
-            self.open()
+        if not self._closing and not self._starting:
+            if self._connection and self._connection.is_open:
+                self._lock.acquire()
+                self._connection.channel(on_open_callback=self.on_channel_open)
+            else:
+                self.open()
 
     def on_channel_open(self, channel):
         logger.info("Channel openned")
