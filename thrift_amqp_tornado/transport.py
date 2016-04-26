@@ -100,6 +100,7 @@ class TAMQPTornadoTransport(TTransportBase):
 
     @gen.coroutine
     def on_connection_error(self, *args, **kwargs):
+        self._starting = False
         logger.info("Connection failed")
         yield gen.sleep(constant.TIMEOUT_RECONNECT)
         self.open(self._callback)
