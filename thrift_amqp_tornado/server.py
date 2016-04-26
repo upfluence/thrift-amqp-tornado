@@ -102,7 +102,7 @@ class TAMQPTornadoServer(object):
         self._channel.basic_consume(self.on_message, self._queue_name,
                                     consumer_tag=self._consumer_tag)
 
-        self.starting = False
+        self._starting = False
 
     @gen.coroutine
     def on_message(self, _channel, method, properties, body):

@@ -107,6 +107,10 @@ class TAMQPTornadoTransport(TTransportBase):
     @gen.coroutine
     def readFrame(self):
         result = yield self._callback_queue.get()
+
+        if issubclass(result.__class__, Exception):
+            raise result
+
         raise gen.Return(result)
 
     @gen.coroutine
@@ -116,6 +120,10 @@ class TAMQPTornadoTransport(TTransportBase):
         yield gen.sleep(constant.TIMEOUT_RECONNECT)
 
         if not self._closing and not self._starting:
+            self._callback_queue.put(
+                thrift.transport.TTransport.TTransportException(
+                    message='channel closed'))
+
             if self._connection and self._connection.is_open:
                 self._lock.acquire()
                 self._connection.channel(on_open_callback=self.on_channel_open)
