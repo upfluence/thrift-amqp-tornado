@@ -119,11 +119,11 @@ class TAMQPTornadoTransport(TTransportBase):
 
         yield gen.sleep(constant.TIMEOUT_RECONNECT)
 
-        if not self._closing and not self._starting:
-            self._callback_queue.put(
-                thrift.transport.TTransport.TTransportException(
-                    message='channel closed'))
+        self._callback_queue.put(
+            thrift.transport.TTransport.TTransportException(
+                message='channel closed'))
 
+        if not self._closing and not self._starting:
             if self._connection and self._connection.is_open:
                 self._lock.acquire()
                 self._connection.channel(on_open_callback=self.on_channel_open)
